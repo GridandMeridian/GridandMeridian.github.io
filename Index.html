@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grid & Meridian | Canada & USA FSBO Network</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        amber: { 400: '#fbbf24', 500: '#f59e0b', 600: '#d97706' },
+                        slate: { 800: '#1e293b', 900: '#0f172a', 950: '#020617' }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Leaflet GIS Map CSS & JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #f59e0b; }
+        #map-container { position: relative; width: 100%; height: 380px; min-height: 380px; max-height: 380px; }
+        #map { width: 100% !important; height: 100% !important; z-index: 1; }
+        .leaflet-control-container { display: none !important; }
+        #submissionModal { z-index: 9999 !important; }
+    </style>
+</head>
+<body class="bg-white text-slate-800 font-sans antialiased min-h-screen flex flex-col custom-scrollbar">
+
+    <!-- HEADER -->
+    <header class="bg-slate-950 text-white border-b border-slate-800 sticky top-0 z-40 px-4 py-3 shadow-xl">
+        <div class="max-w-7xl mx-auto flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-xl bg-amber-500 flex items-center justify-center text-slate-950 font-black text-xl shadow-lg">
+                    <i class="fa-solid fa-landmark text-slate-950"></i>
+                </div>
+                <div>
+                    <h1 class="text-base font-black tracking-tight text-white flex items-center gap-1.5">
+                        Grid & Meridian
+                    </h1>
+                    <p class="text-[10px] text-slate-400 font-semibold">CANADA & USA FSBO NETWORK</p>
+                </div>
+            </div>
+
+            <div class="flex items-center space-x-2">
+                <div class="bg-slate-900 border border-slate-700 rounded-lg p-0.5 flex items-center text-[11px] font-extrabold">
+                    <button id="curr-usd" onclick="setCurrency('USD')" class="px-2 py-1 rounded bg-amber-500 text-slate-950 transition">USD ($)</button>
+                    <button id="curr-cad" onclick="setCurrency('CAD')" class="px-2 py-1 rounded text-slate-400 hover:text-white transition">CAD ($)</button>
+                </div>
+                <button onclick="openModal('submissionModal')" class="w-9 h-9 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black flex items-center justify-center shadow-lg transition transform active:scale-95" title="List Your Property">
+                    <i class="fa-solid fa-plus text-base"></i>
+                </button>
+                <button onclick="toggleMobileMenu()" class="w-9 h-9 rounded-xl bg-slate-900 border border-slate-700 text-slate-300 hover:text-white flex items-center justify-center transition">
+                    <i class="fa-solid fa-bars text-sm"></i>
+                </button>
+            </div>
+        </div>
+
+        <div id="mobile-menu" class="hidden max-w-7xl mx-auto pt-3 pb-1 border-t border-slate-800 mt-3 flex flex-col space-y-2 text-xs font-bold">
+            <button onclick="switchTab('map-view'); toggleMobileMenu();" class="text-left py-2 px-3 rounded bg-slate-900 text-white hover:bg-slate-800 transition">Browse Map & Listings</button>
+            <button onclick="switchTab('pricing-view'); toggleMobileMenu();" class="text-left py-2 px-3 rounded text-slate-300 hover:bg-slate-800 transition">Membership Tiers</button>
+            <button onclick="switchTab('dashboard-view'); toggleMobileMenu();" class="text-left py-2 px-3 rounded text-slate-300 hover:bg-slate-800 transition">Owner Dashboard</button>
+        </div>
+    </header>
+
+    <!-- MAIN BODY -->
+    <main class="flex-grow flex flex-col bg-slate-50">
+
+        <!-- VIEW 1: MAP & LISTINGS -->
+        <div id="map-view" class="flex flex-col w-full space-y-4">
+            
+            <section class="bg-slate-900 text-white py-10 px-4">
+                <div class="max-w-3xl mx-auto text-center space-y-4">
+                    <h2 class="text-3xl md:text-5xl font-black tracking-tight leading-tight">Direct North American For Sale By Owner</h2>
+                    <p class="text-slate-300 text-xs md:text-sm max-w-xl mx-auto">Connect directly with property owners across Canada and the United States[cite: 3]. Zero brokerage commissions, transparent GIS mapping, and verified listings[cite: 3].</p>
+                    
+                    <div class="bg-white rounded-2xl p-3 shadow-xl space-y-2.5 max-w-xl mx-auto text-left text-slate-800">
+                        <div class="relative">
+                            <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-3.5 text-slate-400 text-xs"></i>
+                            <input type="text" id="searchInput" oninput="filterAssets()" placeholder="Search city, state, province or keyword..." class="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 pl-10 pr-4 text-xs text-slate-800 focus:outline-none focus:border-amber-500">
+                        </div>
+                        <div class="relative">
+                            <select id="countrySelect" onchange="filterAssets()" class="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3 text-xs text-slate-800 focus:outline-none focus:border-amber-500 font-semibold">
+                                <option value="ALL">All Countries (CA & US)</option>
+                                <option value="CA">Canada (CA)</option>
+                                <option value="US">United States (US)</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- GIS MAP EXPLORER -->
+            <div class="max-w-7xl mx-auto w-full px-4">
+                <div class="bg-slate-900 rounded-3xl overflow-hidden shadow-xl border border-slate-200">
+                    <div class="p-4 bg-slate-900 text-white flex items-center justify-between text-xs">
+                        <span class="font-bold flex items-center gap-2"><i class="fa-solid fa-map-location-dot text-amber-500"></i> GIS Map Explorer</span>
+                        <span class="bg-slate-800 text-slate-300 px-3 py-1 rounded-full font-bold text-[11px] border border-slate-700" id="map-count-badge">30 properties mapped</span>
+                    </div>
+                    <div id="map-container">
+                        <div id="map"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CATEGORY BAR -->
+            <div class="bg-white/95 border-y border-slate-200 sticky top-[61px] z-30 px-4 py-3 backdrop-blur shadow-sm">
+                <div class="max-w-7xl mx-auto flex items-center justify-start md:justify-center overflow-x-auto gap-2 no-scrollbar text-xs font-bold">
+                    <button onclick="filterCategoryTab('ALL')" id="cat-btn-ALL" class="px-4 py-2 rounded-xl bg-amber-500 text-slate-950 whitespace-nowrap transition shadow-sm">All (30)</button>
+                    <button onclick="filterCategoryTab('Raw Land')" id="cat-btn-Raw Land" class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 whitespace-nowrap transition border border-slate-200">🌲 Raw Land (6)</button>
+                    <button onclick="filterCategoryTab('Farms & Ranches')" id="cat-btn-Farms & Ranches" class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 whitespace-nowrap transition border border-slate-200">🚜 Farms & Ranches (6)</button>
+                    <button onclick="filterCategoryTab('Residential')" id="cat-btn-Residential" class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 whitespace-nowrap transition border border-slate-200">🏡 Residential (6)</button>
+                    <button onclick="filterCategoryTab('Businesses')" id="cat-btn-Businesses" class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 whitespace-nowrap transition border border-slate-200">🏢 Businesses (6)</button>
+                    <button onclick="filterCategoryTab('Rentals')" id="cat-btn-Rentals" class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 whitespace-nowrap transition border border-slate-200">🔑 Rentals (6)</button>
+                </div>
+            </div>
+
+            <!-- PROPERTY CARDS GRID -->
+            <div class="max-w-7xl mx-auto w-full px-4 py-6">
+                <div id="properties-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+            </div>
+        </div>
+
+        <!-- VIEW 2: PRICING -->
+        <div id="pricing-view" class="hidden max-w-7xl mx-auto px-4 py-12 w-full space-y-10">
+            <div class="text-center max-w-3xl mx-auto space-y-3">
+                <span class="text-[10px] font-black tracking-widest text-amber-600 uppercase bg-amber-50 px-3 py-1 rounded-full border border-amber-200">Advertising Packages</span>
+                <h2 class="text-3xl md:text-4xl font-black text-slate-900">Direct Owner Advertising Rates</h2>
+                <p class="text-slate-600 text-xs md:text-sm">List your property directly to verified North American buyers. Zero commission, keep 100% of your equity[cite: 3].</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch">
+                <div class="bg-white rounded-3xl border border-slate-200 p-6 flex flex-col justify-between shadow-lg">
+                    <div class="space-y-4">
+                        <span class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Entry Level</span>
+                        <h3 class="text-xl font-black text-slate-900">Silver Membership</h3>
+                        <div class="flex items-baseline"><span class="text-4xl font-black text-slate-900 price-silver">$299</span><span class="text-slate-500 text-xs font-semibold ml-1"><span class="curr-label">USD</span> / one-time</span></div>
+                        <ul class="space-y-2.5 text-xs text-slate-600 border-t border-slate-100 pt-4 font-medium">
+                            <li><i class="fa-solid fa-check text-amber-500 mr-2"></i><strong>Max 15 Photos</strong> & Media Uploads</li>
+                            <li><i class="fa-solid fa-check text-amber-500 mr-2"></i><strong>3 Months</strong> Active Listing</li>
+                            <li><i class="fa-solid fa-check text-amber-500 mr-2"></i>Direct Owner Inquiry Routing</li>
+                        </ul>
+                    </div>
+                    <button onclick="selectTier('Silver', 299, 15)" class="mt-6 w-full py-3 rounded-xl bg-slate-100 hover:bg-slate-200 font-extrabold text-slate-900 text-xs uppercase transition">Choose Silver ($299)</button>
+                </div>
+
+                <div class="bg-white rounded-3xl border-2 border-amber-500 p-6 flex flex-col justify-between shadow-xl relative">
+                    <div class="absolute -top-3 left-1/2 -translate-x-1/2 bg-amber-500 text-slate-950 text-[9px] font-black uppercase px-3 py-0.5 rounded-full">MOST POPULAR</div>
+                    <div class="space-y-4">
+                        <span class="text-[10px] font-bold text-amber-600 uppercase tracking-widest">Standard Residential & Land</span>
+                        <h3 class="text-xl font-black text-slate-900">Gold Membership</h3>
+                        <div class="flex items-baseline"><span class="text-4xl font-black text-amber-600 price-gold">$699</span><span class="text-slate-500 text-xs font-semibold ml-1"><span class="curr-label">USD</span> / one-time</span></div>
+                        <ul class="space-y-2.5 text-xs text-slate-600 border-t border-slate-100 pt-4 font-medium">
+                            <li><i class="fa-solid fa-check text-amber-500 mr-2"></i><strong>Max 40 Photos</strong> + Video Walkthrough</li>
+                            <li><i class="fa-solid fa-check text-amber-500 mr-2"></i><strong>Active Until Sold Guarantee</strong></li>
+                            <li><i class="fa-solid fa-check text-amber-500 mr-2"></i>30 Days "Featured Asset" Badge</li>
+                        </ul>
+                    </div>
+                    <button onclick="selectTier('Gold', 699, 40)" class="mt-6 w-full py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs uppercase shadow-lg transition">Select Gold ($699)</button>
+                </div>
+
+                <div class="bg-white rounded-3xl border border-slate-200 p-6 flex flex-col justify-between shadow-lg">
+                    <div class="space-y-4">
+                        <span class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Commercial & Enterprise</span>
+                        <h3 class="text-xl font-black text-slate-900">Platinum Membership</h3>
+                        <div class="flex items-baseline"><span class="text-4xl font-black text-slate-900 price-platinum">$1,499</span><span class="text-slate-500 text-xs font-semibold ml-1"><span class="curr-label">USD</span> / one-time</span></div>
+                        <ul class="space-y-2.5 text-xs text-slate-600 border-t border-slate-100 pt-4 font-medium">
+                            <li><i class="fa-solid fa-check text-amber-500 mr-2"></i><strong>Unlimited High-Res Photos</strong> & 3D Tours</li>
+                            <li><i class="fa-solid fa-check text-amber-500 mr-2"></i>Active Until Sold + Priority Support</li>
+                            <li><i class="fa-solid fa-check text-amber-500 mr-2"></i>Automated Investor PDF Brochure</li>
+                        </ul>
+                    </div>
+                    <button onclick="selectTier('Platinum', 1499, 999)" class="mt-6 w-full py-3 rounded-xl bg-slate-100 hover:bg-slate-200 font-extrabold text-slate-900 text-xs uppercase transition">Choose Platinum ($1,499)</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- VIEW 3: DASHBOARD -->
+        <div id="dashboard-view" class="hidden max-w-7xl mx-auto px-4 py-8 w-full space-y-6">
+            <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
+                <div>
+                    <h2 class="text-2xl font-black text-slate-900">Private Seller Dashboard</h2>
+                    <p class="text-xs text-slate-500">Manage your active property listings and review buyer leads.</p>
+                </div>
+                <button onclick="openModal('submissionModal')" class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-black px-4 py-2.5 rounded-xl text-xs transition">
+                    <i class="fa-solid fa-plus mr-1.5"></i> Submit New Listing
+                </button>
+            </div>
+            <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xl">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs text-slate-700">
+                        <thead class="bg-slate-100 text-slate-600 uppercase font-bold border-b border-slate-200">
+                            <tr>
+                                <th class="p-3.5">Property Name</th>
+                                <th class="p-3.5">Category</th>
+                                <th class="p-3.5">Location</th>
+                                <th class="p-3.5">Price</th>
+                                <th class="p-3.5">Status</th>
+                                <th class="p-3.5 text-right">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dashboard-table-body" class="divide-y divide-slate-100"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- FOOTER -->
+    <footer class="bg-slate-950 text-slate-400 border-t border-slate-800 py-10 px-4 text-xs space-y-6">
+        <div class="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div class="space-y-3">
+                <div class="flex items-center space-x-2.5">
+                    <div class="w-7 h-7 rounded-lg bg-amber-500 flex items-center justify-center text-slate-950 font-black text-xs"><i class="fa-solid fa-landmark"></i></div>
+                    <span class="font-bold text-white text-sm">Grid & Meridian</span>
+                </div>
+                <p class="text-slate-400 text-[11px] leading-relaxed">The premier direct For Sale By Owner (FSBO) real estate platform connecting buyers and sellers across Canada and the United States without middleman brokerages[cite: 3].</p>
+            </div>
+            <div class="space-y-1.5">
+                <h4 class="font-bold text-white uppercase tracking-wider text-xs">Coverage Areas</h4>
+                <p class="text-[11px]"><strong>Canada:</strong> Ontario, BC, Alberta, Quebec, Nova Scotia[cite: 5]</p>
+                <p class="text-[11px]"><strong>USA:</strong> California, Texas, Florida, New York, Washington[cite: 5]</p>
+            </div>
+            <div class="space-y-1.5">
+                <h4 class="font-bold text-white uppercase tracking-wider text-xs">Quick Links</h4>
+                <p><a href="#" onclick="switchTab('map-view')" class="hover:text-amber-400 transition">Explore GIS Map</a></p>
+                <p><a href="#" onclick="switchTab('pricing-view')" class="hover:text-amber-400 transition">Membership Tiers</a></p>
+                <p><a href="#" onclick="openModal('submissionModal')" class="hover:text-amber-400 transition">Submit FSBO Listing</a></p>
+            </div>
+        </div>
+        <div class="max-w-7xl mx-auto border-t border-slate-800 pt-5 flex flex-col sm:flex-row justify-between items-center gap-3 text-[11px]">
+            <p>Powered by Stripe checkout integration with encrypted owner verification protocols for Canada & USA[cite: 5].</p>
+            <div class="flex items-center space-x-3 text-slate-300 text-sm">
+                <i class="fa-brands fa-cc-visa"></i>
+                <i class="fa-brands fa-cc-mastercard"></i>
+                <i class="fa-brands fa-cc-amex"></i>
+                <i class="fa-brands fa-stripe"></i>
+            </div>
+        </div>
+    </footer>
+
+    <!-- MODAL -->
+    <div id="submissionModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 hidden flex items-center justify-center p-2 sm:p-4">
+        <div class="bg-white border border-slate-200 rounded-3xl w-full max-w-3xl h-[90vh] flex flex-col overflow-hidden shadow-2xl text-slate-800">
+            <div class="bg-slate-950 text-white px-6 py-4 border-b border-slate-800 flex items-center justify-between shrink-0">
+                <div class="flex items-center space-x-2.5">
+                    <div class="w-8 h-8 rounded-lg bg-amber-500/20 border border-amber-500/40 text-amber-400 flex items-center justify-center font-bold text-xs"><i class="fa-solid fa-house"></i></div>
+                    <div>
+                        <h3 class="font-black text-white text-sm">Private Asset Auto-Post & Stripe Checkout</h3>
+                        <p class="text-[10px] text-slate-400">Enter property details, owner contact info, and upload photos.</p>
+                    </div>
+                </div>
+                <button onclick="closeModal('submissionModal')" class="w-8 h-8 rounded-full bg-slate-800 text-slate-300 hover:text-white flex items-center justify-center transition"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <div class="flex-grow bg-slate-50 overflow-y-auto p-5 space-y-4 text-xs">
+                <div class="space-y-1.5">
+                    <label class="font-bold text-slate-900 uppercase">1. Select Package</label>
+                    <div class="grid grid-cols-3 gap-2">
+                        <button type="button" onclick="setModalTier('Silver', 299, 15)" id="tier-btn-Silver" class="p-2.5 rounded-xl bg-white border border-slate-200 text-center font-bold hover:border-amber-500">Silver ($299)</button>
+                        <button type="button" onclick="setModalTier('Gold', 699, 40)" id="tier-btn-Gold" class="p-2.5 rounded-xl bg-amber-50 border-2 border-amber-500 text-center font-black text-amber-700">Gold ($699)</button>
+                        <button type="button" onclick="setModalTier('Platinum', 1499, 999)" id="tier-btn-Platinum" class="p-2.5 rounded-xl bg-white border border-slate-200 text-center font-bold hover:border-amber-500">Platinum ($1,499)</button>
+                    </div>
+                </div>
+
+                <div class="bg-white p-3.5 rounded-2xl border border-slate-200 space-y-2.5">
+                    <label class="font-bold text-slate-900 uppercase">2. Owner & Contact Information</label>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <input type="text" id="owner-name" placeholder="Owner Name *" class="bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs">
+                        <input type="email" id="owner-email" placeholder="Email Address *" class="bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs">
+                        <input type="tel" id="owner-phone" placeholder="Phone Number *" class="bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs">
+                    </div>
+                </div>
+
+                <div class="space-y-3">
+                    <label class="font-bold text-slate-900 uppercase">3. Property Information</label>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <input type="text" id="new-title" placeholder="Listing Headline / Title *" class="bg-white border border-slate-300 rounded-xl p-2.5 text-xs">
+                        <input type="number" id="new-price" placeholder="Asking Price (USD) *" class="bg-white border border-slate-300 rounded-xl p-2.5 text-xs">
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <select id="new-category" class="bg-white border border-slate-300 rounded-xl p-2.5 text-xs">
+                            <option value="Raw Land">Raw Land</option>
+                            <option value="Farms & Ranches">Farms & Ranches</option>
+                            <option value="Residential">Residential</option>
+                            <option value="Businesses">Businesses</option>
+                            <option value="Rentals">Rentals</option>
+                        </select>
+                        <select id="new-country" class="bg-white border border-slate-300 rounded-xl p-2.5 text-xs">
+                            <option value="CA">Canada (CA)</option>
+                            <option value="US">United States (US)</option>
+                        </select>
+                        <input type="text" id="new-location" placeholder="City, Province/State *" class="bg-white border border-slate-300 rounded-xl p-2.5 text-xs">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-3 gap-3 bg-white p-3.5 rounded-2xl border border-slate-200">
+                    <input type="text" id="new-beds" placeholder="Beds (e.g. 4 Beds)" class="bg-slate-50 border border-slate-300 rounded-xl p-2 text-xs">
+                    <input type="text" id="new-baths" placeholder="Baths (e.g. 3 Baths)" class="bg-slate-50 border border-slate-300 rounded-xl p-2 text-xs">
+                    <input type="text" id="new-size" placeholder="Size (e.g. 3,200 sqft)" class="bg-slate-50 border border-slate-300 rounded-xl p-2 text-xs">
+                </div>
+
+                <div class="bg-white p-3.5 rounded-2xl border border-slate-200 space-y-1.5">
+                    <label class="font-bold text-slate-900 block">4. Upload Property Photos (1 to 2 Photos)</label>
+                    <input type="file" id="new-files" multiple accept="image/*" class="w-full text-xs file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:font-bold file:bg-amber-500 file:text-slate-950">
+                </div>
+
+                <div class="bg-slate-100 p-3 rounded-xl border border-slate-200 space-y-1 text-[11px] text-slate-600">
+                    <p class="font-bold text-amber-700">FSBO Platform Agreement</p>
+                    <p>I confirm I am the legal owner or authorized representative. Grid & Meridian is a software advertising platform and not a licensed broker. All fees are final.</p>
+                    <div class="flex items-center space-x-2 pt-1">
+                        <input type="checkbox" id="legal-check" class="accent-amber-500 w-3.5 h-3.5">
+                        <label for="legal-check" class="font-bold text-slate-900">I Agree to Terms & Verify Ownership</label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-slate-100 px-6 py-3.5 border-t border-slate-200 flex justify-between items-center shrink-0">
+                <span class="font-bold text-slate-700">Total: <span id="checkout-total" class="text-amber-700 text-sm font-black">$699 USD</span></span>
+                <div class="flex space-x-2">
+                    <button onclick="closeModal('submissionModal')" class="px-4 py-2 rounded-xl bg-white border border-slate-300 font-bold text-slate-700">Cancel</button>
+                    <button onclick="processStripeCheckout()" class="px-5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black shadow transition flex items-center gap-1.5"><i class="fa-brands fa-stripe"></i> Pay & Publish</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- JAVASCRIPT ENGINE -->
+    <script>
+        let currentCurrency = 'USD';
+        let cadRate = 1.35;
+        let selectedTierName = 'Gold';
+        let selectedTierPrice = 699;
+        let selectedTierMaxPhotos = 40;
+        let activeCategoryFilter = 'ALL';
+
+        // 30 Verified North American FSBO Listings with exact requested photo adjustments
+        const assetsData = [
+            // --- RAW LAND (6) ---
+            { id: 1, title: "Thunder Bay Timberland & Mineral Lot", type: "Raw Land", country: "CA", location: "Thunder Bay, Ontario", priceUSD: 1370000, beds: "—", baths: "—", size: "420 Acres", ownerEmail: "philip@lariumx.com", ownerPhone: "+1 (780) 555-0111", images: ["https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=800&q=80", "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&fit=crop&w=800&q=80"], lat: 48.3809, lng: -89.2477 },
+            { id: 2, title: "Northern BC Mountain Timber Acreage", type: "Raw Land", country: "CA", location: "Prince George, BC", priceUSD: 700000, beds: "—", baths: "—", size: "320 Acres", ownerEmail: "contact@bcassetdirect.ca", ownerPhone: "+1 (604) 555-0122", images: ["https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=800&q=80"], lat: 53.9171, lng: -122.7497 },
+            { id: 3, title: "Montana Rocky Mountain Development Parcel", type: "Raw Land", country: "US", location: "Missoula, Montana", priceUSD: 1770000, beds: "—", baths: "—", size: "180 Acres", ownerEmail: "montanaland@privateholdings.com", ownerPhone: "+1 (406) 555-0133", images: ["https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=800&q=80", "https://images.unsplash.com/photo-1519681393784-d120267933ba?auto=format&fit=crop&w=800&q=80"], lat: 46.8721, lng: -113.9940 },
+            { id: 4, title: "Yukon Sub-Arctic Mineral Claim", type: "Raw Land", country: "CA", location: "Whitehorse, Yukon", priceUSD: 880000, beds: "—", baths: "—", size: "640 Acres", ownerEmail: "yukonclaims@northasset.ca", ownerPhone: "+1 (867) 555-0144", images: ["https://images.unsplash.com/photo-1519681393784-d120267933ba?auto=format&fit=crop&w=800&q=80"], lat: 60.7212, lng: -135.0568 },
+            { id: 5, title: "Nevada Solar & Desert Acreage", type: "Raw Land", country: "US", location: "Reno, Nevada", priceUSD: 2290000, beds: "—", baths: "—", size: "1,500 Acres", ownerEmail: "nevadasolar@energyholdings.net", ownerPhone: "+1 (775) 555-0155", images: ["https://images.unsplash.com/photo-1508514177221-188b1cf16e9d?auto=format&fit=crop&w=800&q=80", "https://images.unsplash.com/photo-1511497584788-876761197069?auto=format&fit=crop&w=800&q=80"], lat: 39.5296, lng: -119.8138 },
+            { id: 6, title: "Laurentian Shield Waterfront Land", type: "Raw Land", country: "CA", location: "Muskoka, Ontario", priceUSD: 1220000, beds: "—", baths: "—", size: "85 Acres", ownerEmail: "muskokasales@privateadvert.ca", ownerPhone: "+1 (705) 555-0166", images: ["https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80"], lat: 45.0411, lng: -79.3102 },
+
+            // --- FARMS & RANCHES (6) ---
+            { id: 7, title: "Heartland Cattle & Grain Ranch", type: "Farms & Ranches", country: "CA", location: "Foothills County, Alberta", priceUSD: 3100000, beds: "5 Beds", baths: "4 Baths", size: "1,200 Acres", ownerEmail: "ranchdirect@foothillsag.ca", ownerPhone: "+1 (403) 555-0211", images: ["https://images.unsplash.com/photo-1500595046743-cd271d694d30?auto=format&fit=crop&w=800&q=80", "https://images.unsplash.com/photo-1595838788220-410a74d284a1?auto=format&fit=crop&w=800&q=80"], lat: 50.7000, lng: -113.9000 },
+            { id: 8, title: "Big Sky Water-Rights Cattle Ranch", type: "Farms & Ranches", country: "US", location: "Bozeman, Montana", priceUSD: 4290000, beds: "4 Beds", baths: "3.5 Baths", size: "2,400 Acres", ownerEmail: "bozemanranch@agholdings.com", ownerPhone: "+1 (406) 555-0222", images: ["https://images.unsplash.com/photo-1595838788220-410a74d284a1?auto=format&fit=crop&w=800&q=80", "https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=800&q=80"], lat: 45.6770, lng: -111.0429 },
+            { id: 9, title: "Saskatchewan Prairie Wheat & Pulse Farm", type: "Farms & Ranches", country: "CA", location: "Regina, Saskatchewan", priceUSD: 2510000, beds: "3 Beds", baths: "2 Baths", size: "2,800 Acres", ownerEmail: "prairiefarms@saskgrain.ca", ownerPhone: "+1 (306) 555-0233", images: ["https://images.unsplash.com/photo-1625246333195-78d9c38ad449?auto=format&fit=crop&w=800&q=80", "https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&w=800&q=80"], lat: 50.4452, lng: -104.6189 },
+            { id: 10, title: "Okanagan Valley Estate Vineyard", type: "Farms & Ranches", country: "CA", location: "Kelowna, BC", priceUSD: 4510000, beds: "6 Beds", baths: "6 Baths", size: "65 Acres", ownerEmail: "winerydirect@okanaganvines.ca", ownerPhone: "+1 (250) 555-0244", images: ["https://images.unsplash.com/photo-1513836279014-a89f7a76ae86?auto=format&fit=crop&w=800&q=80"], lat: 49.8880, lng: -119.4960 },
+            { id: 11, title: "Idaho Snake River Alfalfa & Dairy", type: "Farms & Ranches", country: "US", location: "Twin Falls, Idaho", priceUSD: 3620000, beds: "4 Beds", baths: "3 Baths", size: "980 Acres", ownerEmail: "idahodairy@snakeriverag.com", ownerPhone: "+1 (208) 555-0255", images: ["https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=800&q=80"], lat: 42.5584, lng: -114.4611 },
+            { id: 12, title: "Peace River Mixed Livestock Farm", type: "Farms & Ranches", country: "CA", location: "Peace River, Alberta", priceUSD: 1620000, beds: "3 Beds", baths: "2 Baths", size: "1,600 Acres", ownerEmail: "peaceriver@agdirect.ca", ownerPhone: "+1 (780) 555-0266", images: ["https://images.unsplash.com/photo-1527847263472-aa5338d178b8?auto=format&fit=crop&w=800&q=80", "https://images.unsplash.com/photo-1592417817098-8f3d691a4bf5?auto=format&fit=crop&w=800&q=80"], lat: 56.2335, lng: -117.2917 },
+
+            // --- RESIDENTIAL (6) ---
+            { id: 13, title: "Modern Architectural Waterfront Estate", type: "Residential", country: "CA", location: "Muskoka, Ontario", priceUSD: 1450000, beds: "4 Beds", baths: "3 Baths", size: "3,200 sqft", ownerEmail: "canmoredirect@privateowner.ca", ownerPhone: "+1 (403) 555-0311", images: ["https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80", "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=800&q=80"], lat: 45.0411, lng: -79.3102 },
+            { id: 14, title: "Seattle Lake Washington Craftsman Home", type: "Residential", country: "US", location: "Seattle, Washington", priceUSD: 1750000, beds: "4 Beds", baths: "3.5 Baths", size: "3,800 sqft", ownerEmail: "seattlehome@directfsbo.com", ownerPhone: "+1 (206) 555-0322", images: ["https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?auto=format&fit=crop&w=800&q=80"], lat: 47.6062, lng: -122.3321 },
+            { id: 15, title: "Miami Beach Designer Penthouse", type: "Residential", country: "US", location: "Miami Beach, Florida", priceUSD: 2450000, beds: "3 Beds", baths: "3 Baths", size: "2,400 sqft", ownerEmail: "miamiowner@penthouseholdings.com", ownerPhone: "+1 (305) 555-0333", images: ["https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80"], lat: 25.7617, lng: -80.1918 },
+            { id: 16, title: "Colorado Mountain Luxury Residence", type: "Residential", country: "US", location: "Aspen, Colorado", priceUSD: 2810000, beds: "5 Beds", baths: "5.5 Baths", size: "4,500 sqft", ownerEmail: "aspenstay@mountainholdings.com", ownerPhone: "+1 (970) 555-0344", images: ["https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=800&q=80"], lat: 39.1911, lng: -106.8175 },
+            { id: 17, title: "Toronto Rosedale Classic Residence", type: "Residential", country: "CA", location: "Toronto, Ontario", priceUSD: 2370000, beds: "4 Beds", baths: "4 Baths", size: "4,100 sqft", ownerEmail: "rosedaleprivate@torontohome.ca", ownerPhone: "+1 (416) 555-0355", images: ["https://images.unsplash.com/photo-1580587771525-78b9dba3b914?auto=format&fit=crop&w=800&q=80", "https://images.unsplash.com/photo-1583847268964-b28dc8f51f92?auto=format&fit=crop&w=800&q=80"], lat: 43.6532, lng: -79.3832 },
+            { id: 18, title: "Scottsdale Desert Suburban Residence", type: "Residential", country: "US", location: "Scottsdale, Arizona", priceUSD: 1550000, beds: "4 Beds", baths: "3 Baths", size: "3,300 sqft", ownerEmail: "azresident@desertasset.com", ownerPhone: "+1 (480) 555-0366", images: ["https://images.unsplash.com/photo-1613490493576-7fde63acd811?auto=format&fit=crop&w=800&q=80"], lat: 33.4942, lng: -111.9261 },
+
+            // --- BUSINESSES (6) ---
+            { id: 19, title: "Austin Tech Hub Commercial Plaza", type: "Businesses", country: "US", location: "Austin, Texas", priceUSD: 4810000, beds: "—", baths: "—", size: "24,000 SqFt", ownerEmail: "austinplaza@commercialdirect.com", ownerPhone: "+1 (512) 555-0411", images: ["https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=800&q=80", "https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=800&q=80"], lat: 30.2672, lng: -97.7431 },
+            { id: 20, title: "Calgary Downtown Boutique Hotel & Lounge", type: "Businesses", country: "CA", location: "Calgary, Alberta", priceUSD: 6590000, beds: "—", baths: "—", size: "32,000 SqFt", ownerEmail: "hotelowner@yyccommercial.ca", ownerPhone: "+1 (403) 555-0422", images: ["https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=800&q=80"], lat: 51.0447, lng: -114.0719 },
+            { id: 21, title: "Chicago Industrial Logistics Hub", type: "Businesses", country: "US", location: "Chicago, Illinois", priceUSD: 9250000, beds: "—", baths: "—", size: "65,000 SqFt", ownerEmail: "chicagologistics@industrialdirect.com", ownerPhone: "+1 (312) 555-0433", images: ["https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=800&q=80", "https://images.unsplash.com/photo-1578575437130-527eed3abbec?auto=format&fit=crop&w=800&q=80"], lat: 41.8781, lng: -87.6298 },
+            { id: 22, title: "Edmonton Highway Fuel & Carwash", type: "Businesses", country: "CA", location: "Edmonton, Alberta", priceUSD: 2810000, beds: "—", baths: "—", size: "12,000 SqFt", ownerEmail: "edmontonfuel@businessdirect.ca", ownerPhone: "+1 (780) 555-0444", images: ["https://images.unsplash.com/photo-1545128485-c400e7702796?auto=format&fit=crop&w=800&q=80"], lat: 53.5461, lng: -113.4938 },
+            { id: 23, title: "Denver Mountain Resort Retail Center", type: "Businesses", country: "US", location: "Denver, Colorado", priceUSD: 4140000, beds: "—", baths: "—", size: "18,500 SqFt", ownerEmail: "denverretail@commercialholdings.com", ownerPhone: "+1 (303) 555-0455", images: ["https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=800&q=80", "https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=800&q=80"], lat: 39.7392, lng: -104.9903 },
+            { id: 24, title: "Montreal Old Port Restaurant & Bar", type: "Businesses", country: "CA", location: "Montreal, Quebec", priceUSD: 2140000, beds: "—", baths: "—", size: "7,200 SqFt", ownerEmail: "mtlrestos@commercialdirect.ca", ownerPhone: "+1 (514) 555-0466", images: ["https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=800&q=80"], lat: 45.5017, lng: -73.5673 },
+
+            // --- RENTALS (6) ---
+            { id: 25, title: "Downtown Luxury Penthouse Lease Portfolio", type: "Rentals", country: "CA", location: "Toronto, Ontario", priceUSD: 1070000, beds: "12 Beds", baths: "8 Baths", size: "6 Units", ownerEmail: "torontorentals@investmentportfolio.ca", ownerPhone: "+1 (416) 555-0511", images: ["https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=800&q=80", "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=800&q=80"], lat: 43.6510, lng: -79.3470 },
+            { id: 26, title: "Miami Beach Multi-Family Rental Complex", type: "Rentals", country: "US", location: "Miami, Florida", priceUSD: 3550000, beds: "28 Beds", baths: "20 Baths", size: "14 Units", ownerEmail: "miamirentals@multifamilydirect.com", ownerPhone: "+1 (305) 555-0522", images: ["https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80"], lat: 25.7617, lng: -80.1918 },
+            { id: 27, title: "Whistler Ski-In / Ski-Out Chalet Rentals", type: "Rentals", country: "CA", location: "Whistler, BC", priceUSD: 2370000, beds: "16 Beds", baths: "14 Baths", size: "4 Units", ownerEmail: "whistlerchalets@rentaldirect.ca", ownerPhone: "+1 (604) 555-0533", images: ["https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=800&q=80"], lat: 50.1163, lng: -122.9574 },
+            { id: 28, title: "San Diego Coastal Triplex Rental Asset", type: "Rentals", country: "US", location: "San Diego, California", priceUSD: 2030000, beds: "9 Beds", baths: "6 Baths", size: "3 Units", ownerEmail: "sandiegorentals@coastalholdings.com", ownerPhone: "+1 (619) 555-0544", images: ["https://images.unsplash.com/photo-1570129477492-45c003edd2be?auto=format&fit=crop&w=800&q=80"], lat: 32.7157, lng: -117.1611 },
+            { id: 29, title: "Ottawa Investment Duplex Portfolio", type: "Rentals", country: "CA", location: "Ottawa, Ontario", priceUSD: 850000, beds: "10 Beds", baths: "6 Baths", size: "8 Units", ownerEmail: "ottawaunits@rentalportfolio.ca", ownerPhone: "+1 (613) 555-0555", images: ["https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=800&q=80", "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=800&q=80"], lat: 45.4215, lng: -75.6972 },
+            { id: 30, title: "New York Brooklyn Commercial Rental Bay", type: "Rentals", country: "US", location: "New York, New York", priceUSD: 2920000, beds: "—", baths: "—", size: "5 Units", ownerEmail: "nycrentals@commercialleasing.com", ownerPhone: "+1 (212) 555-0566", images: ["https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=800&q=80"], lat: 40.6782, lng: -73.9442 }
+        ];
+
+        let map, markersGroup;
+        const activeImageIndices = {};
+
+        function initMap() {
+            if (document.getElementById('map')) {
+                map = L.map('map', { zoomControl: false }).setView([49.2827, -101.5547], 4);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+                markersGroup = L.layerGroup().addTo(map);
+                renderAssets();
+                setTimeout(() => map.invalidateSize(), 300);
+            }
+        }
+
+        function toggleMobileMenu() {
+            document.getElementById('mobile-menu').classList.toggle('hidden');
+        }
+
+        function getFilteredAssets() {
+            const query = document.getElementById('searchInput').value.toLowerCase();
+            const country = document.getElementById('countrySelect').value;
+            
+            return assetsData.filter(item => {
+                const matchSearch = item.title.toLowerCase().includes(query) || item.location.toLowerCase().includes(query) || item.type.toLowerCase().includes(query);
+                const matchCountry = (country === 'ALL' || item.country === country);
+                const matchCat = (activeCategoryFilter === 'ALL' || item.type === activeCategoryFilter);
+                return matchSearch && matchCountry && matchCat;
+            });
+        }
+
+        function renderMarkers(filtered) {
+            if (!markersGroup) return;
+            markersGroup.clearLayers();
+            filtered.forEach(asset => {
+                const priceText = formatCurrency(asset.priceUSD);
+                const marker = L.marker([asset.lat, asset.lng]).addTo(markersGroup);
+                marker.bindPopup(`
+                    <div style="color: #0f172a; font-family: sans-serif; padding: 4px;">
+                        <span style="font-size: 10px; font-weight: 800; background: #f59e0b; color: #020617; padding: 2px 6px; border-radius: 4px; text-transform: uppercase;">${asset.type}</span>
+                        <h4 style="font-weight: 800; margin-top: 4px; margin-bottom: 2px; font-size: 13px;">${asset.title}</h4>
+                        <p style="font-size: 11px; color: #475569; margin: 0;">${asset.location}</p>
+                        <p style="font-size: 13px; font-weight: 900; color: #d97706; margin-top: 4px;">${priceText}</p>
+                    </div>
+                `);
+            });
+            document.getElementById('map-count-badge').innerText = `${filtered.length} properties mapped`;
+        }
+
+        function changeImage(assetId, direction) {
+            const asset = assetsData.find(a => a.id === assetId);
+            if (!asset || !asset.images || asset.images.length <= 1) return;
+            if (activeImageIndices[assetId] === undefined) activeImageIndices[assetId] = 0;
+            
+            activeImageIndices[assetId] += direction;
+            if (activeImageIndices[assetId] >= asset.images.length) activeImageIndices[assetId] = 0;
+            if (activeImageIndices[assetId] < 0) activeImageIndices[assetId] = asset.images.length - 1;
+
+            const imgEl = document.getElementById(`asset-img-${assetId}`);
+            const countEl = document.getElementById(`img-count-${assetId}`);
+            if (imgEl) imgEl.src = asset.images[activeImageIndices[assetId]];
+            if (countEl) countEl.innerText = `${activeImageIndices[assetId] + 1} / ${asset.images.length}`;
+        }
+
+        function renderCardHTML(asset) {
+            const formattedPrice = formatCurrency(asset.priceUSD);
+            if (activeImageIndices[asset.id] === undefined) activeImageIndices[asset.id] = 0;
+            const currentImgIndex = activeImageIndices[asset.id];
+            const currentImg = asset.images[currentImgIndex] || asset.images[0];
+            const totalImgs = asset.images.length;
+            const countryBadge = asset.country === 'CA' ? 'Canada' : 'USA';
+
+            return `
+            <div class="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-md hover:shadow-xl hover:border-amber-500 transition duration-300 flex flex-col justify-between">
+                <div class="relative h-56 bg-slate-900 overflow-hidden">
+                    <img id="asset-img-${asset.id}" src="${currentImg}" alt="${asset.title}" class="w-full h-full object-cover">
+                    
+                    <div class="absolute top-3 left-3 bg-slate-900/90 text-amber-400 font-extrabold text-[10px] px-2.5 py-1 rounded-md uppercase tracking-wider border border-amber-500/30">
+                        ${asset.type.toUpperCase()}
+                    </div>
+
+                    <div class="absolute top-3 right-3 bg-amber-500 text-slate-950 font-black text-[10px] px-3 py-1 rounded-full uppercase shadow">
+                        ${countryBadge}
+                    </div>
+
+                    ${totalImgs > 1 ? `
+                    <button onclick="changeImage(${asset.id}, -1)" class="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-slate-950/70 hover:bg-slate-950 text-white flex items-center justify-center text-xs transition">
+                        <i class="fa-solid fa-chevron-left"></i>
+                    </button>
+                    <button onclick="changeImage(${asset.id}, 1)" class="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-slate-950/70 hover:bg-slate-950 text-white flex items-center justify-center text-xs transition">
+                        <i class="fa-solid fa-chevron-right"></i>
+                    </button>
+                    <div class="absolute bottom-2 right-2 bg-slate-950/80 text-white font-bold text-[10px] px-2 py-0.5 rounded-full backdrop-blur">
+                        <i class="fa-solid fa-camera mr-1"></i> <span id="img-count-${asset.id}">${currentImgIndex + 1} / ${totalImgs}</span>
+                    </div>
+                    ` : ''}
+                </div>
+
+                <div class="p-5 space-y-3 flex-grow flex flex-col justify-between">
+                    <div class="space-y-1.5">
+                        <h4 class="font-black text-base text-slate-900 leading-snug">${asset.title}</h4>
+                        <p class="text-xs text-slate-500"><i class="fa-solid fa-location-dot text-amber-500 mr-1"></i> ${asset.location}</p>
+                        
+                        <div class="flex items-center gap-4 text-xs text-slate-600 pt-1">
+                            <span><i class="fa-solid fa-bed text-amber-500 mr-1"></i> ${asset.beds}</span>
+                            <span><i class="fa-solid fa-bath text-amber-500 mr-1"></i> ${asset.baths}</span>
+                            <span><i class="fa-solid fa-ruler-combined text-amber-500 mr-1"></i> ${asset.size}</span>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center justify-between border-t border-slate-100 pt-3 mt-2">
+                        <div>
+                            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">DIRECT OWNER PRICE</span>
+                            <span class="font-black text-slate-900 text-lg">${formattedPrice}</span>
+                        </div>
+                        <button onclick="openModal('submissionModal')" class="bg-slate-900 hover:bg-slate-800 text-white font-bold px-4 py-2.5 rounded-xl text-xs shadow transition">
+                            Contact Owner
+                        </button>
+                    </div>
+                </div>
+            </div>`;
+        }
+
+        function renderAssets() {
+            const filtered = getFilteredAssets();
+            document.getElementById('properties-grid').innerHTML = filtered.map(renderCardHTML).join('');
+            renderMarkers(filtered);
+            renderDashboardTable();
+        }
+
+        function filterAssets() {
+            renderAssets();
+        }
+
+        function filterCategoryTab(category) {
+            activeCategoryFilter = category;
+            ['ALL', 'Raw Land', 'Farms & Ranches', 'Residential', 'Businesses', 'Rentals'].forEach(cat => {
+                const btn = document.getElementById(`cat-btn-${cat}`);
+                if (btn) {
+                    btn.className = (cat === category) 
+                        ? 'px-4 py-2 rounded-xl bg-amber-500 text-slate-950 whitespace-nowrap transition shadow-sm font-extrabold'
+                        : 'px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 whitespace-nowrap transition border border-slate-200 font-bold';
+                }
+            });
+            renderAssets();
+        }
+
+        function renderDashboardTable() {
+            const tbody = document.getElementById('dashboard-table-body');
+            if (!tbody) return;
+            tbody.innerHTML = assetsData.slice(0, 8).map(asset => `
+                <tr class="hover:bg-slate-50">
+                    <td class="p-3.5 font-bold text-slate-900">${asset.title}</td>
+                    <td class="p-3.5"><span class="px-2 py-0.5 rounded bg-slate-100 text-amber-700 border border-slate-200 font-bold">${asset.type}</span></td>
+                    <td class="p-3.5">${asset.location}</td>
+                    <td class="p-3.5 font-black text-slate-900">${formatCurrency(asset.priceUSD)}</td>
+                    <td class="p-3.5"><span class="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold uppercase text-[10px]">FSBO VERIFIED</span></td>
+                    <td class="p-3.5 text-right"><button class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 rounded text-slate-700 font-bold">Manage</button></td>
+                </tr>
+            `).join('');
+        }
+
+        function setCurrency(curr) {
+            currentCurrency = curr;
+            document.getElementById('curr-usd').className = curr === 'USD' ? 'px-2 py-1 rounded bg-amber-500 text-slate-950 transition font-bold' : 'px-2 py-1 rounded text-slate-400 hover:text-white transition font-bold';
+            document.getElementById('curr-cad').className = curr === 'CAD' ? 'px-2 py-1 rounded bg-amber-500 text-slate-950 transition font-bold' : 'px-2 py-1 rounded text-slate-400 hover:text-white transition font-bold';
+            document.querySelectorAll('.curr-label').forEach(el => el.innerText = curr);
+            
+            if (curr === 'CAD') {
+                document.querySelector('.price-silver').innerText = '$400';
+                document.querySelector('.price-gold').innerText = '$940';
+                document.querySelector('.price-platinum').innerText = '$2,020';
+            } else {
+                document.querySelector('.price-silver').innerText = '$299';
+                document.querySelector('.price-gold').innerText = '$699';
+                document.querySelector('.price-platinum').innerText = '$1,499';
+            }
+            renderAssets();
+            setModalTier(selectedTierName, selectedTierPrice, selectedTierMaxPhotos);
+        }
+
+        function formatCurrency(valUSD) {
+            const val = currentCurrency === 'CAD' ? valUSD * cadRate : valUSD;
+            return new Intl.NumberFormat('en-US', { style: 'currency', currency: currentCurrency, maximumFractionDigits: 0 }).format(val);
+        }
+
+        function switchTab(tabId) {
+            ['map-view', 'pricing-view', 'dashboard-view'].forEach(id => {
+                document.getElementById(id).classList.add('hidden');
+            });
+            document.getElementById(tabId).classList.remove('hidden');
+            if (tabId === 'map-view' && map) {
+                setTimeout(() => map.invalidateSize(), 200);
+            }
+        }
+
+        function selectTier(tierName, price, maxPhotos) {
+            selectedTierName = tierName;
+            selectedTierPrice = price;
+            selectedTierMaxPhotos = maxPhotos;
+            openModal('submissionModal');
+            setModalTier(tierName, price, maxPhotos);
+        }
+
+        function setModalTier(tierName, price, maxPhotos) {
+            selectedTierName = tierName;
+            selectedTierPrice = price;
+            selectedTierMaxPhotos = maxPhotos;
+            ['Silver', 'Gold', 'Platinum'].forEach(t => {
+                const btn = document.getElementById(`tier-btn-${t}`);
+                if (btn) {
+                    btn.className = (t === tierName)
+                        ? 'p-2.5 rounded-xl bg-amber-50 border-2 border-amber-500 text-center font-black text-amber-700'
+                        : 'p-2.5 rounded-xl bg-white border border-slate-200 text-center font-bold text-slate-700 hover:border-amber-500';
+                }
+            });
+            const displayPrice = currentCurrency === 'CAD' ? Math.round(price * cadRate) : price;
+            document.getElementById('checkout-total').innerText = `$${displayPrice.toLocaleString()} ${currentCurrency}`;
+        }
+
+        function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
+        function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+
+        function processStripeCheckout() {
+            if (!document.getElementById('legal-check').checked) {
+                alert('Please agree to the platform terms and verify ownership before publishing.');
+                return;
+            }
+            const ownerName = document.getElementById('owner-name').value.trim();
+            const title = document.getElementById('new-title').value.trim();
+            const price = parseFloat(document.getElementById('new-price').value);
+            const category = document.getElementById('new-category').value;
+            const country = document.getElementById('new-country').value;
+            const location = document.getElementById('new-location').value.trim();
+            const fileInput = document.getElementById('new-files');
+
+            if (!ownerName || !title || !price || !location) {
+                alert('Please fill out all required fields.');
+                return;
+            }
+
+            let imgs = ["https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80"];
+            if (fileInput.files.length > 0) {
+                imgs = Array.from(fileInput.files).map(f => URL.createObjectURL(f));
+            }
+
+            const newAsset = {
+                id: assetsData.length + 1,
+                title: title,
+                type: category,
+                country: country,
+                location: location,
+                priceUSD: price,
+                beds: "4 Beds",
+                baths: "3 Baths",
+                size: "Custom Asset",
+                ownerEmail: document.getElementById('owner-email').value || 'owner@domain.com',
+                ownerPhone: document.getElementById('owner-phone').value || '+1 (555) 0199',
+                images: imgs,
+                lat: country === 'CA' ? 51.0447 : 37.0902,
+                lng: country === 'CA' ? -114.0719 : -95.7129
+            };
+
+            assetsData.unshift(newAsset);
+            renderAssets();
+            closeModal('submissionModal');
+            alert(`Listing "${title}" successfully paid & published live!`);
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            initMap();
+        });
+    </script>
+</body>
+</html>
