@@ -1,1 +1,0 @@
-# GridandMeridian.github.io
